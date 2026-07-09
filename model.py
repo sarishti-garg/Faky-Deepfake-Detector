@@ -49,7 +49,7 @@ def load_image(image_path):
     if img is not None:
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-        faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
+        faces = face_cascade.detectMultiScale(gray, scaleFactor=1.05, minNeighbors=4, minSize=(10, 10))
         if len(faces) > 0:
             # Crop the first detected face with a 15% margin
             x, y, w, h = faces[0]
@@ -69,7 +69,7 @@ def load_image(image_path):
     image_tensor = transform(image).unsqueeze(0)
     return image, image_tensor
 
-def combine_predictions(model1, model2, model3, inputs, device, threshold=0.5):
+def combine_predictions(model1, model2, model3, inputs, device, threshold=0.30):
     """Computes weighted confidence scores for 'real' and 'fake' classification."""
     # inputs is a [0, 1] range tensor
     inputs = inputs.to(device)
@@ -93,7 +93,7 @@ def combine_predictions(model1, model2, model3, inputs, device, threshold=0.5):
     probs2 = torch.sigmoid(outputs2)
     probs3 = outputs3  # Meso4 output is already sigmoid-activated
 
-    weight1, weight2, weight3 = 0.50, 0.15, 0.35
+    weight1, weight2, weight3 = 0.70, 0.15, 0.15
 
     weighted_avg_fake_confidence = (weight1 * (1 - probs1) + weight2 * (1 - probs2) + weight3 * (1 - probs3))
     weighted_avg_real_confidence = (weight1 * probs1 + weight2 * probs2 + weight3 * probs3)
@@ -105,9 +105,9 @@ def combine_predictions(model1, model2, model3, inputs, device, threshold=0.5):
     else:
         final_prediction = "Uncertain"
 
-    return final_prediction, weighted_avg_fake_confidence.item(), weighted_avg_real_confidence.item()
+    return final_prediction, weighted_avg_fake_confidence.item(), weighted_avg_real_confidence.item(), (probs1.item(), probs2.item(), probs3.item())
 
-def make_predictions(image_path, model_paths):
+def make_predictions(image_path, model_paths, threshold=0.30):
     """Loads models, processes the image, and returns classification result with visualization."""
 
     model1, model2, model3 = load_models(model_paths)
@@ -120,7 +120,7 @@ def make_predictions(image_path, model_paths):
     image, inputs = load_image(image_path)
     inputs = inputs.to(device)
 
-    prediction, fake_conf, real_conf = combine_predictions(model1, model2, model3, inputs, device)
+    prediction, fake_conf, real_conf, individual_probs = combine_predictions(model1, model2, model3, inputs, device, threshold=threshold)
 
     try:
         plt.figure(figsize=(6, 6))
@@ -136,4 +136,4 @@ def make_predictions(image_path, model_paths):
     print(f"Real Confidence: {real_conf:.4f}, Fake Confidence: {fake_conf:.4f}")
     print(f"Final Prediction: {prediction}")
 
-    return prediction, (real_conf, fake_conf)
+    return prediction, (real_conf, fake_conf), individual_probs

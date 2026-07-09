@@ -1,39 +1,41 @@
 ---
 title: Faky Detector
-emoji: 🏢
+emoji: 👁️
 colorFrom: gray
 colorTo: blue
-sdk: gradio
-sdk_version: 6.20.0
+sdk: streamlit
+sdk_version: 1.32.0
 python_version: '3.12'
-app_file: app.py
+app_file: streamlit_app.py
 pinned: false
 license: mit
 ---
 
 # Faky: Deepfake Image Detector
 
-Faky is a web-based Deepfake detection application powered by **Gradio** and **PyTorch**. It utilizes an ensemble of convolutional neural network models to classify images as **Real**, **Fake**, or **Uncertain** based on confidence scores.
+Faky is a web-based Deepfake detection application powered by **Streamlit**, **OpenCV**, and **PyTorch**. It utilizes a calibrated ensemble of deep learning convolutional neural network models to classify portrait images as **Real** or **Fake**.
 
 ---
 
 ## 🚀 Features
-- **Multi-Model Ensemble**: Combines predictions from multiple deep learning architectures to compute a weighted confidence score.
-- **Gradio Web Interface**: A sleek, user-friendly interface allowing users to upload images and see real-time classification probability bars.
-- **Inference Visualization**: Automated classification output showing probability scores.
+- **Multi-Model Ensemble**: Combines predictions from multiple deep learning architectures to compute a robust weighted average.
+- **Robust Face Detection**: Automatic OpenCV Haar Cascade face crop with optimized parameters (`scaleFactor=1.05`, `minNeighbors=4`) to detect low-resolution, webcam, and tilted faces, falling back to full-image analysis when no face is present.
+- **Premium Streamlit UI**: A clean, color-coded status box displaying only the final prediction (**Real** in green or **Fake** in red).
 
 ---
 
-## 🛠️ Model Ensemble
+## 🛠️ Model Ensemble & Decision Logic
 The detector loads and averages confidence scores from three pre-trained models:
-1. **EfficientNet-B0** (`parameters/FFPP.pt`) — Weighted at **50%**
-2. **MobileNet-V2** (`parameters/MobileViT_FFPP.pt`) — Weighted at **15%**
-3. **MobileNet-V2 / MesoNet** (`parameters/Mesonet_FFPP.pt`) — Weighted at **35%**
+1. **Xception** (`parameters/FFPP.pt`) — Weighted at **70%** (Primary robust classifier)
+2. **MobileViT-XXS** (`parameters/MobileViT_FFPP.pt`) — Weighted at **15%**
+3. **Meso4** (`parameters/Mesonet_FFPP.pt`) — Weighted at **15%**
 
-A weighted average is computed:
-- **Real** if Real Confidence > 0.50
-- **Fake** if Fake Confidence > 0.50
-- **Uncertain** if neither crosses the threshold.
+### Decision Boundary
+A weighted real probability score is computed. The classification is made using a calibrated fixed threshold of **`0.30`**:
+- **Real** if Ensemble Real Score > 0.30
+- **Fake** if Ensemble Real Score <= 0.30
+
+This calibration prevents low-resolution camera blur and JPEG compression artifacts on real photos from triggering false "Fake" classifications, while keeping high sensitivity for actual deepfakes.
 
 ---
 
@@ -44,9 +46,10 @@ A weighted average is computed:
 ├── uploads/             # Temporary folder for uploaded images
 ├── .gitattributes       # Git LFS configurations
 ├── .gitignore           # File/folder ignore list for Git
-├── app.py               # Gradio web application server
+├── app.py               # Gradio web application (backup deployment option)
 ├── mesonet.py           # MesoNet (Meso4) model architecture
-├── model.py             # Inference pipeline and model helper functions
+├── model.py             # Inference pipeline, face crop, and ensemble logic
+├── streamlit_app.py     # Main Streamlit web application
 └── requirements.txt     # Python dependencies
 ```
 
@@ -79,20 +82,20 @@ pip install -r requirements.txt
 
 ### 4. Download Model Weights
 Make sure to place your model weight files inside the `parameters/` directory:
-- `FFPP.pt`
-- `MobileViT_FFPP.pt`
-- `Mesonet_FFPP.pt`
+- `FFPP.pt` (Xception)
+- `MobileViT_FFPP.pt` (MobileViT-XXS)
+- `Mesonet_FFPP.pt` (MesoNet)
 
 ---
 
 ## 🏃 How to Run the App Locally
 
-1. Start the Gradio server:
+1. Start the Streamlit server:
    ```bash
-   python app.py
+   streamlit run streamlit_app.py
    ```
 2. Open your web browser and navigate to:
    ```text
-   http://127.0.0.1:7860/
+   http://localhost:8501
    ```
-3. Upload an image (JPG/JPEG) to check if it's real or fake.
+3. Upload an image (JPG/JPEG/PNG) to analyze.

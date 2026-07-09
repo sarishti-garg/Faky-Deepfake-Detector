@@ -26,7 +26,7 @@ def predict_image(image_path):
         return "Please upload an image."
     
     # Get predictions from our model ensemble
-    prediction, (real_conf, fake_conf) = make_predictions(image_path, model_paths)
+    prediction, (real_conf, fake_conf), _ = make_predictions(image_path, model_paths)
     
     # Return dictionary with probabilities for Gradio Label output
     return {
