@@ -1,37 +1,40 @@
 import os
-
-from flask import Flask, render_template, request, jsonify
+import gradio as gr
 from model import make_predictions
 
-app = Flask(__name__)
-
+# Define the models to load
 model_paths = [
     "parameters/FFPP.pt",
     "parameters/MobileViT_FFPP.pt",
     "parameters/Mesonet_FFPP.pt"
 ]
 
-UPLOAD_FOLDER = "uploads"
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
+def predict_image(image_path):
+    if not image_path:
+        return "Please upload an image."
+    
+    # Get predictions from our model ensemble
+    prediction, (real_conf, fake_conf) = make_predictions(image_path, model_paths)
+    
+    # Return dictionary with probabilities for Gradio Label output
+    return {
+        "Real": real_conf,
+        "Fake": fake_conf
+    }
 
-
-@app.route('/')
-def home():
-    return render_template('index.html')
-
-@app.route('/upload', methods=['POST'])
-def upload_file():
-    if 'file' not in request.files:
-        return jsonify({"error": "No file part"})
-    file = request.files['file']
-    if file.filename == '':
-        return jsonify({"error": "No selected file"})
-    if file:
-        file_path = os.path.join(app.config["UPLOAD_FOLDER"], file.filename)
-        file.save(file_path)
-        predictions = make_predictions(file_path, model_paths)
-        return "Predictions: " + str(predictions)
+# Create Gradio interface
+demo = gr.Interface(
+    fn=predict_image,
+    inputs=gr.Image(type="filepath", label="Upload Image"),
+    outputs=gr.Label(num_top_classes=2, label="Prediction Confidence"),
+    title="Faky: Deepfake Image Detector",
+    description="Upload an image to analyze and detect if it is Real or Fake using an ensemble of deep learning models.",
+    examples=[
+        ["uploads/deepfake2.jpg"]
+    ] if os.path.exists("uploads/deepfake2.jpg") else None
+)
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    # Launch the Gradio app
+    # Hugging Face Spaces automatically sets the port and handles routing
+    demo.launch()

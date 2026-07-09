@@ -89,11 +89,15 @@ def make_predictions(image_path, model_paths):
 
     prediction, fake_conf, real_conf = combine_predictions(model1, model2, model3, inputs, device)
 
-    plt.figure(figsize=(6, 6))
-    plt.imshow(image)
-    plt.axis("off")
-    plt.title(f"Prediction: {prediction}\nReal: {real_conf:.4f}, Fake: {fake_conf:.4f}", fontsize=12, color='black')
-    plt.show()
+    try:
+        plt.figure(figsize=(6, 6))
+        plt.imshow(image)
+        plt.axis("off")
+        plt.title(f"Prediction: {prediction}\nReal: {real_conf:.4f}, Fake: {fake_conf:.4f}", fontsize=12, color='black')
+        plt.show()
+    except Exception:
+        pass
+
 
     print(f"Image: {image_path}")
     print(f"Real Confidence: {real_conf:.4f}, Fake Confidence: {fake_conf:.4f}")
