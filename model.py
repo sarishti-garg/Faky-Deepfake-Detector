@@ -3,6 +3,8 @@ import torch
 import torch.nn.functional as F
 import torchvision.models as models
 import matplotlib.pyplot as plt
+import timm
+from mesonet import Meso4
 
 from PIL import Image
 from torchvision import transforms
@@ -20,21 +22,17 @@ def load_models(model_paths):
     model2_path = model_paths[1]
     model3_path = model_paths[2]
 
-    model1 = models.efficientnet_b0(pretrained=True)
-    model2 = models.mobilenet_v2(pretrained=True)
-    model3 = models.mobilenet_v2(pretrained=True)
-
-    model1.classifier = torch.nn.Linear(model1.classifier[1].in_features, 1)
-    model2.classifier = torch.nn.Linear(model2.classifier[1].in_features, 1)
-    model3.classifier = torch.nn.Linear(model3.classifier[1].in_features, 1)
+    model1 = timm.create_model('xception', pretrained=False, num_classes=1)
+    model2 = timm.create_model('mobilevit_xxs', pretrained=False, num_classes=1)
+    model3 = Meso4(num_classes=1)
 
     checkpoint1 = torch.load(model1_path, map_location=torch.device('cpu'), weights_only=False)
     checkpoint2 = torch.load(model2_path, map_location=torch.device('cpu'), weights_only=False)
     checkpoint3 = torch.load(model3_path, map_location=torch.device('cpu'), weights_only=False)
 
-    model1.load_state_dict(checkpoint1.get("model_state_dict", checkpoint1), strict=False)
-    model2.load_state_dict(checkpoint2.get("model_state_dict", checkpoint2), strict=False)
-    model3.load_state_dict(checkpoint3.get("model_state_dict", checkpoint3), strict=False)
+    model1.load_state_dict(checkpoint1.get("model_state_dict", checkpoint1), strict=True)
+    model2.load_state_dict(checkpoint2.get("model_state_dict", checkpoint2), strict=True)
+    model3.load_state_dict(checkpoint3.get("model_state_dict", checkpoint3), strict=True)
 
     model1.eval()
     model2.eval()
@@ -54,11 +52,14 @@ def combine_predictions(model1, model2, model3, inputs, device, threshold=0.5):
 
     outputs1 = model1(inputs)
     outputs2 = model2(inputs)
-    outputs3 = model3(inputs)
+    
+    # MesoNet expects 128x128 input
+    inputs_m3 = F.interpolate(inputs, size=(128, 128), mode='bilinear', align_corners=False)
+    outputs3 = model3(inputs_m3)
 
     probs1 = torch.sigmoid(outputs1)
     probs2 = torch.sigmoid(outputs2)
-    probs3 = torch.sigmoid(outputs3)
+    probs3 = outputs3  # Meso4 output is already sigmoid-activated
 
     weight1, weight2, weight3 = 0.50, 0.15, 0.35
 
