@@ -2,6 +2,16 @@ import os
 import gradio as gr
 from model import make_predictions
 
+# Hugging Face ZeroGPU requirement: import spaces and decorate the prediction function
+try:
+    import spaces
+except ImportError:
+    # Dummy decorator fallback for running locally without spaces library
+    class spaces:
+        @staticmethod
+        def GPU(func):
+            return func
+
 # Define the models to load
 model_paths = [
     "parameters/FFPP.pt",
@@ -9,7 +19,9 @@ model_paths = [
     "parameters/Mesonet_FFPP.pt"
 ]
 
+@spaces.GPU
 def predict_image(image_path):
+
     if not image_path:
         return "Please upload an image."
     
