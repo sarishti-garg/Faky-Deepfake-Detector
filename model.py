@@ -44,27 +44,34 @@ def load_models(model_paths):
 
 def load_image(image_path):
     """Loads, detects/crops faces, preprocesses, and returns the image and tensor."""
-    # Try to detect and crop face using OpenCV Haar Cascade
     img = cv2.imread(image_path)
+    face_detected = False
+    
     if img is not None:
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-        faces = face_cascade.detectMultiScale(gray, scaleFactor=1.05, minNeighbors=4, minSize=(10, 10))
-        if len(faces) > 0:
-            # Crop the first detected face with a 15% margin
-            x, y, w, h = faces[0]
-            margin = int(0.15 * w)
-            h_img, w_img, _ = img.shape
-            y1 = max(0, y - margin)
-            y2 = min(h_img, y + h + margin)
-            x1 = max(0, x - margin)
-            x2 = min(w_img, x + w + margin)
-            face = img[y1:y2, x1:x2]
-            image = Image.fromarray(cv2.cvtColor(face, cv2.COLOR_BGR2RGB))
+        try:
+            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+            faces = face_cascade.detectMultiScale(gray, scaleFactor=1.05, minNeighbors=4, minSize=(10, 10))
+            if len(faces) > 0:
+                # Crop the first detected face with a 15% margin
+                x, y, w, h = faces[0]
+                margin = int(0.15 * w)
+                h_img, w_img, _ = img.shape
+                y1 = max(0, y - margin)
+                y2 = min(h_img, y + h + margin)
+                x1 = max(0, x - margin)
+                x2 = min(w_img, x + w + margin)
+                face = img[y1:y2, x1:x2]
+                image = Image.fromarray(cv2.cvtColor(face, cv2.COLOR_BGR2RGB))
+                face_detected = True
+        except Exception as e:
+            print(f"Warning: OpenCV face detection failed ({e}). Falling back to whole image.")
+
+    if not face_detected:
+        if img is not None:
+            image = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
         else:
             image = Image.open(image_path).convert("RGB")
-    else:
-        image = Image.open(image_path).convert("RGB")
 
     image_tensor = transform(image).unsqueeze(0)
     return image, image_tensor
