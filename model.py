@@ -5,14 +5,16 @@ import torchvision.models as models
 import matplotlib.pyplot as plt
 import timm
 from mesonet import Meso4
+import cv2
+import numpy as np
 
 from PIL import Image
 from torchvision import transforms
 
+# The base transform only converts the image to a tensor in [0, 1] range.
+# Sizing and normalization are handled dynamically for each model in combine_predictions.
 transform = transforms.Compose([
-    transforms.Resize((224, 224)),
-    transforms.ToTensor(),
-    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])  # ImageNet mean & std
+    transforms.ToTensor()
 ])
 
 def load_models(model_paths):
@@ -41,19 +43,49 @@ def load_models(model_paths):
     return model1, model2, model3
 
 def load_image(image_path):
-    """Loads, preprocesses, and returns an image tensor and the original image."""
-    image = Image.open(image_path).convert("RGB")  # Ensure RGB format
-    image_tensor = transform(image).unsqueeze(0)  # Apply transformations & add batch dimension
+    """Loads, detects/crops faces, preprocesses, and returns the image and tensor."""
+    # Try to detect and crop face using OpenCV Haar Cascade
+    img = cv2.imread(image_path)
+    if img is not None:
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+        faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
+        if len(faces) > 0:
+            # Crop the first detected face with a 15% margin
+            x, y, w, h = faces[0]
+            margin = int(0.15 * w)
+            h_img, w_img, _ = img.shape
+            y1 = max(0, y - margin)
+            y2 = min(h_img, y + h + margin)
+            x1 = max(0, x - margin)
+            x2 = min(w_img, x + w + margin)
+            face = img[y1:y2, x1:x2]
+            image = Image.fromarray(cv2.cvtColor(face, cv2.COLOR_BGR2RGB))
+        else:
+            image = Image.open(image_path).convert("RGB")
+    else:
+        image = Image.open(image_path).convert("RGB")
+
+    image_tensor = transform(image).unsqueeze(0)
     return image, image_tensor
 
 def combine_predictions(model1, model2, model3, inputs, device, threshold=0.5):
     """Computes weighted confidence scores for 'real' and 'fake' classification."""
+    # inputs is a [0, 1] range tensor
     inputs = inputs.to(device)
 
-    outputs1 = model1(inputs)
-    outputs2 = model2(inputs)
+    # Model 1 (Xception) expects 224x224 and ImageNet normalization
+    inputs_m1 = F.interpolate(inputs, size=(224, 224), mode='bilinear', align_corners=False)
+    mean = torch.tensor([0.485, 0.456, 0.406], device=device).view(1, 3, 1, 1)
+    std = torch.tensor([0.229, 0.224, 0.225], device=device).view(1, 3, 1, 1)
+    inputs_m1 = (inputs_m1 - mean) / std
+    outputs1 = model1(inputs_m1)
+
+    # Model 2 (MobileViT) expects 256x256 simple [0, 1] scaling
+    inputs_m2 = F.interpolate(inputs, size=(256, 256), mode='bilinear', align_corners=False)
+    outputs2 = model2(inputs_m2)
     
-    # MesoNet expects 128x128 input
+    # Model 3 (MesoNet) expects 128x128 simple [0, 1] scaling
     inputs_m3 = F.interpolate(inputs, size=(128, 128), mode='bilinear', align_corners=False)
     outputs3 = model3(inputs_m3)
 

@@ -3,4 +3,6 @@ torch
 torchvision
 matplotlib
 timm
-gradio
+gradio
+opencv-python-headless
+
