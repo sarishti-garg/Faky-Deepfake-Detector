@@ -122,14 +122,7 @@ def make_predictions(image_path, model_paths, threshold=0.30):
 
     prediction, fake_conf, real_conf, individual_probs = combine_predictions(model1, model2, model3, inputs, device, threshold=threshold)
 
-    try:
-        plt.figure(figsize=(6, 6))
-        plt.imshow(image)
-        plt.axis("off")
-        plt.title(f"Prediction: {prediction}\nReal: {real_conf:.4f}, Fake: {fake_conf:.4f}", fontsize=12, color='black')
-        plt.show()
-    except Exception:
-        pass
+
 
 
     print(f"Image: {image_path}")
